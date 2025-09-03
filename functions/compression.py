@@ -1,12 +1,28 @@
 
 from objects.data_bytes import bytewriter
 from objects.data_bytes import bytereader
+from PIL import Image
 import numpy as np
 import rle
 import io
 
+def max4len(val): 
+	return (val/2).__ceil__()
+
+def p1_to_p(imgdata, width, height): 
+	imgdata = Image.frombytes('1', (width, height), imgdata, 'raw')
+	imgdata = np.frombuffer(imgdata.convert('L').tobytes(), 'B')
+	imgdata = (imgdata>0).astype(np.uint8)
+	return imgdata.tobytes()
+
+def p_to_p1(imgdata, width, height): 
+	imgdata = np.frombuffer(imgdata, 'B')
+	imgdata = (imgdata!=0).astype(np.uint8)*255
+	imgdata = Image.frombytes('L', (width, height), imgdata, 'raw')
+	return imgdata.convert('1').tobytes()
+
 def p_to_p4(imgdata): 
-	oimgdata = np.zeros((len(imgdata)/2).__ceil__(), 'B')
+	oimgdata = np.zeros(max4len(len(imgdata)), 'B')
 	firstd = imgdata[0::2]
 	secondd = imgdata[1::2]
 	oimgdata[0:len(firstd)] = firstd<<4
@@ -36,7 +52,7 @@ def lzma_decompress(data):
 	data = obj.decompress(data)
 	return data
 
-def compress_rle8c_256(rawdata): 
+def compress_sir16_256(rawdata): 
 	orgsize = len(rawdata)
 	valrep = rle_getv(rawdata)
 
@@ -61,9 +77,22 @@ def compress_rle8c_256(rawdata):
 		else:
 			return None
 
-	return f.getvalue()
+	return b'sir16_256'+f.getvalue()
 
-def compress_rle8c_16(rawdata): 
+def compress_sir16_256_old(rawdata): 
+	orgsize = len(rawdata)
+	valrep = rle_getv(rawdata)
+
+	f = bytewriter.bytewriter()
+	for value, repeats in valrep:
+		if f.end<orgsize:
+			f.varint(repeats)
+			f.uint8(value)
+		else:
+			return None
+	return b'sir16_256'+f.getvalue()
+
+def compress_sir16_16(rawdata): 
 	orgsize = len(rawdata)
 	valrep = rle_getv(p4_to_p(rawdata))
 	f = bytewriter.bytewriter()
@@ -80,29 +109,11 @@ def compress_rle8c_16(rawdata):
 					f.uint16(outval)
 		else:
 			return None
-	return f.getvalue()
+	return b'sir16__16'+f.getvalue()
 
-def internal__comp_rle4c_valmake(value, size): 
-	return (int(value)<<4) + int(size)
-
-def internal__comp_rle4c_writerepeat(value, repeats, f): 
-	f.uint8(internal__comp_rle4c_valmake(value, min(repeats, 0xf)))
-	if repeats>=0xf:
-		f.varint(max(0, repeats//0xf))
-		repeatremaining = repeats%0xf
-		if repeatremaining: f.uint8(internal__comp_rle4c_valmake(value, repeatremaining))
-
-def compress_rle4c(rawdata): 
-	orgsize = len(rawdata)
-	f = bytewriter.bytewriter()
-	valrep = rle_getv(p4_to_p(rawdata))
-	for value, repeats in valrep:
-		if f.end<orgsize: internal__comp_rle4c_writerepeat(value, repeats, f)
-		else: return None
-	return f.getvalue()
-
-def decompress_rle8c_256(rawdata):
+def decompress_sir16_256(rawdata):
 	b_in = bytereader.bytereader(rawdata)
+	b_in.magic_check(b'sir16_256')
 	b_out = io.BytesIO()
 	while b_in.remaining():
 		repeats = b_in.varint()
@@ -115,8 +126,9 @@ def decompress_rle8c_256(rawdata):
 			b_out.write(o.tobytes())
 	return b_out.getvalue()
 
-def decompress_rle8c_16(rawdata):
+def decompress_sir16_16(rawdata):
 	b_in = bytereader.bytereader(rawdata)
+	b_in.magic_check(b'sir16__16')
 	b_out = io.BytesIO()
 	while b_in.remaining():
 		v = b_in.uint16()
@@ -132,39 +144,28 @@ def decompress_rle8c_16(rawdata):
 	outdata = p_to_p4(intdata).tobytes()
 	return outdata
 
-def decompress_rle4c(rawdata):
-	b_in = bytereader.bytereader(rawdata)
-	b_out = io.BytesIO()
-	while b_in.remaining():
-		v = b_in.uint8()
-		value = v>>4
-		repeats = v&0xf
-		repeatmax = 0
-		if repeats==0xf: repeats *= b_in.varint()
-		o = np.zeros(repeats, np.uint8)
-		o[:] = value
-		b_out.write(o.tobytes())
-	outdata = b_out.getvalue()
-	intdata = np.frombuffer(outdata, 'B')
-	outdata = p_to_p4(intdata).tobytes()
-	return outdata
 
 
+def internal__comp_sir8_valmake(value, size): 
+	return (int(value)<<4) + int(size)
 
-def compress_rle8c_256_old(rawdata): 
+def internal__comp_sir8_writerepeat(value, repeats, f): 
+	f.uint8(internal__comp_sir8_valmake(value, min(repeats, 0xf)))
+	if repeats>=0xf:
+		f.varint(max(0, repeats//0xf))
+		repeatremaining = repeats%0xf
+		if repeatremaining: f.uint8(internal__comp_sir8_valmake(value, repeatremaining))
+
+def compress_sir8(rawdata): 
 	orgsize = len(rawdata)
-	valrep = rle_getv(rawdata)
-
 	f = bytewriter.bytewriter()
+	valrep = rle_getv(p4_to_p(rawdata))
 	for value, repeats in valrep:
-		if f.end<orgsize:
-			f.varint(repeats)
-			f.uint8(value)
-		else:
-			return None
-	return f.getvalue()
+		if f.end<orgsize: internal__comp_sir8_writerepeat(value, repeats, f)
+		else: return None
+	return b'sir8__16'+f.getvalue()
 
-def compress_rle4c_useless(rawdata): 
+def compress_sir8_other(rawdata): 
 	orgsize = len(rawdata)
 	f = bytewriter.bytewriter()
 	valrep = rle_getv(p4_to_p(rawdata))
@@ -178,16 +179,41 @@ def compress_rle4c_useless(rawdata):
 			if inlong==1: 
 				for x in range(inrepeats):
 					value, repeats = valrep[countv]
-					#print('REPEAT', value, repeats)
-					internal__comp_rle4c_writerepeat(value, repeats, f)
+					internal__comp_sir8_writerepeat(value, repeats, f)
 					countv += 1
 			else:
-				value = vals[countv:countv+inrepeats]
-				repraw = max(inrepeats, 0xf)
-				#print('RAW', value, inrepeats)
-				f.uint8(internal__comp_rle4c_valmake(repraw, 0))
-				if inrepeats>=0xf: f.varint(inrepeats-0xf)
-				f.l_uint8( p_to_p4(value), (inrepeats/2).__ceil__())
+				v = valrep[countv:countv+inrepeats]
+				outvals = v['vals']
+				lenvals = len(outvals)
+				internal__comp_sir8_writerepeat(min(0xf, lenvals), 0, f)
+				if lenvals==0xf: f.varint(lenvals-0xf)
+				f.raw(p_to_p4(outvals))
 				countv += inrepeats
 
-	return f.getvalue()
+	return b'sir8__16'+f.getvalue()
+
+def decompress_sir8(rawdata):
+	b_in = bytereader.bytereader(rawdata)
+	b_in.magic_check(b'sir8__16')
+	b_out = io.BytesIO()
+	while b_in.remaining():
+		v = b_in.uint8()
+		value = v>>4
+		repeats = v&0xf
+		repeatmax = 0
+		if repeats==0xf: repeats *= b_in.varint()
+		if repeats:
+			o = np.zeros(repeats, np.uint8)
+			o[:] = value
+			b_out.write(o.tobytes())
+		else:
+			sized = value
+			if sized==0xf: sized += b_in.varint()
+			nonrepd = b_in.raw(max4len(sized))
+			nonrepd = p4_to_p(nonrepd)[0:sized]
+			b_out.write(nonrepd.tobytes())
+
+	outdata = b_out.getvalue()
+	intdata = np.frombuffer(outdata, 'B')
+	outdata = p_to_p4(intdata).tobytes()
+	return outdata

@@ -40,6 +40,7 @@ COL_TYPE_INDEXA_8 = 'IDX_8A'
 COL_TYPE_INDEXSA_8 = 'IDX_8A_SEP'
 COL_TYPE_INDEX_4 = 'IDX_4'
 COL_TYPE_INDEXA_4 = 'IDX_4A'
+COL_TYPE_INDEX_1 = 'IDX_1'
 
 COL_TYPE_GRAY_INDEX_4 = 'IDX_BW_4A'
 
@@ -58,30 +59,43 @@ def compress_qoi(image_mode, rawdata, width, height):
 		rawdata = qoi.encode(rgb)
 		return rawdata
 
-def compress_rle8c(image_mode, rawdata): 
-	if image_mode in (COL_TYPE_GRAY_8, COL_TYPE_INDEXA_8, COL_TYPE_INDEX_8, COL_TYPE_WHITE_8A, COL_TYPE_BLACK_8A):
-		return compression.compress_rle8c_256(rawdata)
-	if image_mode in (COL_TYPE_INDEX_4, COL_TYPE_INDEXA_4, COL_TYPE_GRAY_INDEX_4):
-		return compression.compress_rle8c_16(rawdata)
+sir16_8_compat = (
+	COL_TYPE_GRAY_8, 
+	COL_TYPE_INDEXA_8, 
+	COL_TYPE_INDEX_8, 
+	COL_TYPE_WHITE_8A, 
+	COL_TYPE_BLACK_8A,
+	COL_TYPE_GRAY_1,
+	COL_TYPE_INDEX_1,
+	)
 
-def compress_rle4c(image_mode, rawdata): 
-	if image_mode in (COL_TYPE_INDEX_4, COL_TYPE_INDEXA_4, COL_TYPE_GRAY_INDEX_4):
+sir8_4_compat = (
+	COL_TYPE_INDEX_4,
+	COL_TYPE_INDEXA_4,
+	COL_TYPE_GRAY_INDEX_4, 
+	COL_TYPE_GRAY_1,
+	COL_TYPE_INDEX_1,
+	)
 
-		imgd = compression.compress_rle4c(rawdata)
-		img3 = compression.compress_rle4c_useless(rawdata)
-		if imgd and img3: return img3 if len(img3)>len(imgd) else imgd
-		elif imgd: return imgd
-		elif img3: return img3
+def compress_sir16(image_mode, rawdata): 
+	if image_mode in sir16_8_compat:
+		return compression.compress_sir16_256(rawdata)
+	if image_mode in sir8_4_compat:
+		return compression.compress_sir16_16(rawdata)
 
-def decompress_rle8c(image_mode, rawdata): 
-	if image_mode in (COL_TYPE_GRAY_8, COL_TYPE_INDEXA_8, COL_TYPE_INDEX_8, COL_TYPE_WHITE_8A, COL_TYPE_BLACK_8A):
-		return compression.decompress_rle8c_256(rawdata)
-	if image_mode in (COL_TYPE_INDEX_4, COL_TYPE_INDEXA_4, COL_TYPE_GRAY_INDEX_4):
-		return compression.decompress_rle8c_16(rawdata)
+def compress_sir8(image_mode, rawdata): 
+	if image_mode in sir8_4_compat:
+		return compression.compress_sir8(rawdata)
 
-def decompress_rle4c(image_mode, rawdata): 
-	if image_mode in (COL_TYPE_INDEX_4, COL_TYPE_INDEXA_4, COL_TYPE_GRAY_INDEX_4):
-		return compression.decompress_rle4c(rawdata)
+def decompress_sir16(image_mode, rawdata): 
+	if image_mode in sir16_8_compat:
+		return compression.decompress_sir16_256(rawdata)
+	if image_mode in sir8_4_compat:
+		return compression.decompress_sir16_16(rawdata)
+
+def decompress_sir8(image_mode, rawdata): 
+	if image_mode in sir8_4_compat:
+		return compression.decompress_sir8(rawdata)
 
 class peridot_image:
 	def __init__(self):
@@ -118,8 +132,8 @@ class peridot_image:
 		if not (self.compress_mode or self.compress_li_mode):
 			orawdata = self.img_data
 			if li_comptype == 'qoi': orawdata = compress_qoi(self.img_ctype, orawdata, self.width, self.height)
-			if li_comptype == 'rle4c': orawdata = compress_rle4c(self.img_ctype, orawdata)
-			if li_comptype == 'rle8c': orawdata = compress_rle8c(self.img_ctype, orawdata)
+			if li_comptype == 'sir8': orawdata = compress_sir8(self.img_ctype, orawdata)
+			if li_comptype == 'sir16': orawdata = compress_sir16(self.img_ctype, orawdata)
 			if orawdata:
 				if 'zlib' == comptype: orawdata = zlib.compress(orawdata, 1)
 				elif 'lzma' == comptype: orawdata = compress_lzma(orawdata)
@@ -138,16 +152,16 @@ class peridot_image:
 			bestsizelist.append([None, None, rawdata])
 			if self.img_ctype == COL_TYPE_RGB_8 or self.img_ctype == COL_TYPE_RGBA_8:
 				bestsizelist.append(['qoi', None, 
-					compress_lzma(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
+					compress_qoi(self.img_ctype, rawdata, self.width, self.height)
 					])
 	
-			rle_data = compress_rle4c(self.img_ctype, rawdata)
+			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle4c', None, rle_data])
+				bestsizelist.append(['sir8', None, rle_data])
 
-			rle_data = compress_rle8c(self.img_ctype, rawdata)
+			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle8c', None, rle_data])
+				bestsizelist.append(['sir16', None, rle_data])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
 			self.compress_li_mode, self.compress_mode, self.img_data = bestsizelist[sorted(bestsizelist)[0]]
@@ -164,15 +178,15 @@ class peridot_image:
 					compress_lzma(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
 					])
 	
-			rle_data = compress_rle4c(self.img_ctype, rawdata)
+			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle4c', None, rle_data])
-				bestsizelist.append(['rle4c', 'lzma', compress_lzma(rle_data)])
+				bestsizelist.append(['sir8', None, rle_data])
+				bestsizelist.append(['sir8', 'lzma', compress_lzma(rle_data)])
 
-			rle_data = compress_rle8c(self.img_ctype, rawdata)
+			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle8c', None, rle_data])
-				bestsizelist.append(['rle8c', 'lzma', compress_lzma(rle_data)])
+				bestsizelist.append(['sir16', None, rle_data])
+				bestsizelist.append(['sir16', 'lzma', compress_lzma(rle_data)])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
 			self.compress_li_mode, self.compress_mode, self.img_data = bestsizelist[sorted(bestsizelist)[0]]
@@ -194,19 +208,19 @@ class peridot_image:
 				bestsizelist.append(['qoi', 'brotli', brotli.compress(qoi_data)])
 				bestsizelist.append(['qoi', 'bz2', bz2.compress(qoi_data)])
 	
-			rle_data = compress_rle4c(self.img_ctype, rawdata)
+			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle4c', 'lzma', compress_lzma(rle_data)])
-				bestsizelist.append(['rle4c', 'zlib', zlib.compress(rle_data)])
-				bestsizelist.append(['rle4c', 'brotli', brotli.compress(rle_data)])
-				bestsizelist.append(['rle4c', 'bz2', bz2.compress(rle_data)])
+				bestsizelist.append(['sir8', 'lzma', compress_lzma(rle_data)])
+				bestsizelist.append(['sir8', 'zlib', zlib.compress(rle_data)])
+				bestsizelist.append(['sir8', 'brotli', brotli.compress(rle_data)])
+				bestsizelist.append(['sir8', 'bz2', bz2.compress(rle_data)])
 
-			rle_data = compress_rle8c(self.img_ctype, rawdata)
+			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
-				bestsizelist.append(['rle8c', 'lzma', compress_lzma(rle_data)])
-				bestsizelist.append(['rle8c', 'zlib', zlib.compress(rle_data)])
-				bestsizelist.append(['rle8c', 'brotli', brotli.compress(rle_data)])
-				bestsizelist.append(['rle8c', 'bz2', bz2.compress(rle_data)])
+				bestsizelist.append(['sir16', 'lzma', compress_lzma(rle_data)])
+				bestsizelist.append(['sir16', 'zlib', zlib.compress(rle_data)])
+				bestsizelist.append(['sir16', 'brotli', brotli.compress(rle_data)])
+				bestsizelist.append(['sir16', 'bz2', bz2.compress(rle_data)])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
 			self.compress_li_mode, self.compress_mode, self.img_data = bestsizelist[sorted(bestsizelist)[0]]
@@ -215,8 +229,8 @@ class peridot_image:
 	def li_decompress(self):
 		if self.compress_li_mode and not self.compress_mode:
 			if 'qoi' == self.compress_li_mode: self.img_data = qoi.decode(self.img_data).tobytes()
-			if 'rle8c' == self.compress_li_mode: self.img_data = decompress_rle8c(self.img_ctype, self.img_data)
-			if 'rle4c' == self.compress_li_mode: self.img_data = decompress_rle4c(self.img_ctype, self.img_data)
+			if 'sir16' == self.compress_li_mode: self.img_data = decompress_sir16(self.img_ctype, self.img_data)
+			if 'sir8' == self.compress_li_mode: self.img_data = decompress_sir8(self.img_ctype, self.img_data)
 			self.compress_li_mode = None
 
 	def decompress(self):
@@ -308,7 +322,7 @@ class peridot_image:
 					intdata = compression.p_to_p4(intdata)
 					self.img_data = intdata.tobytes()
 					self.img_ctype = COL_TYPE_INDEXA_4
-					if VERBOSE_COLTYPECHANGE: print('---- rgb8a > index4a: %i colors' % len(self.pal_data))
+					if VERBOSE_COLTYPECHANGE: print('---- index8a > index4a: %i colors' % len(self.pal_data))
 					return True
 
 	def convert__rgb8a__index8sa(self):
@@ -382,6 +396,18 @@ class peridot_image:
 					if VERBOSE_COLTYPECHANGE: print('---- Index8 > Index4')
 					return True
 
+	def convert__index8__index1(self):
+		if not self.is_compressed():
+			if self.img_ctype == COL_TYPE_INDEX_8:
+				datalen = len(self.pal_data)
+				if self.pal_ctype == 'RGB': datalen = datalen//3
+				if self.pal_ctype == 'BGRX': datalen = datalen//4
+				if datalen<=2: 
+					self.img_ctype = COL_TYPE_INDEX_1
+					self.img_data = compression.p_to_p1(self.img_data, self.width, self.height)
+					if VERBOSE_COLTYPECHANGE: print('---- Index8 > Index1')
+					return True
+
 	def convert__gray8a__bw8a(self):
 		if not self.is_compressed():
 			if self.img_ctype == COL_TYPE_GRAY_8A:
@@ -401,9 +427,10 @@ class peridot_image:
 	def convert__gray8__gray4(self):
 		if not self.is_compressed():
 			if self.img_ctype == COL_TYPE_GRAY_8:
-				tempdata = np.frombuffer(self.img_data, 'B')
-				uniq_val, uniq_inverse = np.unique(tempdata, axis=0, return_inverse=True)
+
 				if (self.width*self.height)<=MAX_MEGAPIXEL_SMALLER:
+					tempdata = np.frombuffer(self.img_data, 'B')
+					uniq_val, uniq_inverse = np.unique(tempdata, axis=0, return_inverse=True)
 					if len(uniq_val)<16:
 						self.pal_ctype = COL_TYPE_GRAY_8
 						self.pal_data = uniq_val
@@ -411,20 +438,33 @@ class peridot_image:
 						self.img_data = compression.p_to_p4(uniq_inverse.astype(np.uint8))
 						if VERBOSE_COLTYPECHANGE: print('---- gray8 > gray4')
 
+	def convert__gray8__gray1(self):
+		if not self.is_compressed():
+			if self.img_ctype == COL_TYPE_GRAY_8:
+				tempdata = np.frombuffer(self.img_data, 'B')
+				tempdata = 1-(tempdata+1)
+				if all((tempdata<2).flatten()):
+					self.pal_ctype = COL_TYPE_RGB_8
+					self.pal_data = []
+					self.img_ctype = COL_TYPE_GRAY_1
+					self.img_data = compression.p_to_p1(tempdata, self.width, self.height)
+					if VERBOSE_COLTYPECHANGE: print('---- gray8 > gray1')
+
 	def optimize(self):
 		if not self.compress_mode:
-			if self.img_ctype == COL_TYPE_RGBA_8:
-				self.convert__rgb8a__gray8a()
-				self.convert__rgb8a__rgb8()
-				self.convert__rgb8a__index8a()
-				self.convert__index8a__index4a()
-				self.convert__rgb8a__index8sa()
-				self.convert__gray8a__gray8()
-				self.convert__rgb8__gray8()
-				self.convert__rgb8__index8()
-				self.convert__index8__index4()
-				self.convert__gray8a__bw8a()
-				self.convert__gray8__gray4()
+			self.convert__rgb8a__gray8a()
+			self.convert__rgb8a__rgb8()
+			self.convert__rgb8a__index8a()
+			self.convert__index8a__index4a()
+			self.convert__rgb8a__index8sa()
+			self.convert__gray8a__gray8()
+			self.convert__rgb8__gray8()
+			self.convert__rgb8__index8()
+			self.convert__index8__index1()
+			self.convert__index8__index4()
+			self.convert__gray8a__bw8a()
+			self.convert__gray8__gray1()
+			self.convert__gray8__gray4()
 
 	def make_pil_compat(self):
 		if self.img_ctype == COL_TYPE_INDEXSA_8:
@@ -461,6 +501,11 @@ class peridot_image:
 			self.img_data = compression.p4_to_p(self.img_data)
 			self.img_ctype = COL_TYPE_INDEX_8
 			if VERBOSE_COLTYPECHANGE: print('---- index4 > index8')
+
+		if self.img_ctype == COL_TYPE_INDEX_1:
+			self.img_data = compression.p1_to_p(self.img_data, self.width, self.height)
+			self.img_ctype = COL_TYPE_INDEX_8
+			if VERBOSE_COLTYPECHANGE: print('---- index1 > index8')
 
 		if self.img_ctype == COL_TYPE_WHITE_8A:
 			tempdata = np.zeros((self.width*self.height, 2), 'B')
@@ -560,16 +605,16 @@ def imageobj_to_containerdata(imgdata, container_obj, compress_mode, **kwargs):
 		if not compdone and 'qoi:zlib' in compress_mode: compdone = peri_image.li_compress('qoi', 'zlib')
 		if not compdone and 'qoi:brotli' in compress_mode: compdone = peri_image.li_compress('qoi', 'brotli')
 		if not compdone and 'qoi:bz2' in compress_mode: compdone = peri_image.li_compress('qoi', 'bz2')
-		if not compdone and 'rle4c' in compress_mode: compdone = peri_image.li_compress('rle4c', None)
-		if not compdone and 'rle4c:lzma' in compress_mode: compdone = peri_image.li_compress('rle4c', 'lzma')
-		if not compdone and 'rle4c:zlib' in compress_mode: compdone = peri_image.li_compress('rle4c', 'zlib')
-		if not compdone and 'rle4c:brotli' in compress_mode: compdone = peri_image.li_compress('rle4c', 'brotli')
-		if not compdone and 'rle4c:bz2' in compress_mode: compdone = peri_image.li_compress('rle4c', 'bz2')
-		if not compdone and 'rle8c' in compress_mode: compdone = peri_image.li_compress('rle8c', None)
-		if not compdone and 'rle8c:lzma' in compress_mode: compdone = peri_image.li_compress('rle8c', 'lzma')
-		if not compdone and 'rle8c:zlib' in compress_mode: compdone = peri_image.li_compress('rle8c', 'zlib')
-		if not compdone and 'rle8c:brotli' in compress_mode: compdone = peri_image.li_compress('rle8c', 'brotli')
-		if not compdone and 'rle8c:bz2' in compress_mode: compdone = peri_image.li_compress('rle8c', 'bz2')
+		if not compdone and 'sir8' in compress_mode: compdone = peri_image.li_compress('sir8', None)
+		if not compdone and 'sir8:lzma' in compress_mode: compdone = peri_image.li_compress('sir8', 'lzma')
+		if not compdone and 'sir8:zlib' in compress_mode: compdone = peri_image.li_compress('sir8', 'zlib')
+		if not compdone and 'sir8:brotli' in compress_mode: compdone = peri_image.li_compress('sir8', 'brotli')
+		if not compdone and 'sir8:bz2' in compress_mode: compdone = peri_image.li_compress('sir8', 'bz2')
+		if not compdone and 'sir16' in compress_mode: compdone = peri_image.li_compress('sir16', None)
+		if not compdone and 'sir16:lzma' in compress_mode: compdone = peri_image.li_compress('sir16', 'lzma')
+		if not compdone and 'sir16:zlib' in compress_mode: compdone = peri_image.li_compress('sir16', 'zlib')
+		if not compdone and 'sir16:brotli' in compress_mode: compdone = peri_image.li_compress('sir16', 'brotli')
+		if not compdone and 'sir16:bz2' in compress_mode: compdone = peri_image.li_compress('sir16', 'bz2')
 		if not compdone and 'zlib' in compress_mode: compdone = peri_image.compress('zlib')
 		if not compdone and 'lzma' in compress_mode: compdone = peri_image.compress('lzma')
 		if not compdone and 'brotli' in compress_mode: compdone = peri_image.compress('brotli')
@@ -578,7 +623,7 @@ def imageobj_to_containerdata(imgdata, container_obj, compress_mode, **kwargs):
 	compress_mode = peri_image.get_comptxt()
 	if compress_mode: container_obj.add_value(ID_COMPRESSTYPE, T_STRING, compress_mode)
 
-	if peri_image.img_ctype in [COL_TYPE_INDEX_8, COL_TYPE_INDEX_4]:
+	if peri_image.img_ctype in [COL_TYPE_INDEX_8, COL_TYPE_INDEX_4, COL_TYPE_INDEX_1]:
 		paldata = np.frombuffer(peri_image.pal_data, 'B').flatten()
 		container_obj.add_value(ID_PALLETE_COLORTYPE, T_STRING, peri_image.pal_ctype)
 		container_obj.add_value_list(ID_PALLETE_DATA, T_UINT8, paldata)
@@ -632,7 +677,7 @@ def container_to_image(container_obj, filename, byr_stream):
 			if idnume == ID_COMPRESSTYPE: 
 				compress_mode = x.getvalue(byr_stream).split(':')
 				if len(compress_mode)==1: 
-					if compress_mode[0] in ['qoi', 'rle8c', 'rle4c']: peri_image.compress_li_mode = compress_mode[0]
+					if compress_mode[0] in ['qoi', 'sir16', 'sir8']: peri_image.compress_li_mode = compress_mode[0]
 					else: peri_image.compress_mode = compress_mode[0]
 				if len(compress_mode)==2: peri_image.compress_li_mode, peri_image.compress_mode = compress_mode
 				comptype = peri_image.get_comptxt()
