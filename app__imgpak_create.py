@@ -7,19 +7,24 @@ comptype = ['vfast']
 container_obj = peridot_container()
 container_obj.datatype = 'Topaz ImgPack'
 
+startpath = '..\\imagepack_in'
+
 import glob
 paths = []
-paths += glob.glob('..\\imagepack_in\\**\\*.jpg', recursive=True)
-paths += glob.glob('..\\imagepack_in\\**\\*.tga', recursive=True)
-paths += glob.glob('..\\imagepack_in\\**\\*.png', recursive=True)
-paths += glob.glob('..\\imagepack_in\\**\\*.bmp', recursive=True)
-paths += glob.glob('..\\imagepack_in\\**\\*.gif', recursive=True)
+paths += glob.glob(startpath+'\\**\\*.jpg', recursive=True)
+paths += glob.glob(startpath+'\\**\\*.tga', recursive=True)
+paths += glob.glob(startpath+'\\**\\*.png', recursive=True)
+paths += glob.glob(startpath+'\\**\\*.bmp', recursive=True)
+paths += glob.glob(startpath+'\\**\\*.gif', recursive=True)
 
 for num, filename in enumerate(paths):
 	if not os.path.isdir(filename):
 		filesize = os.path.getsize(filename)
 
-		image_mode, compdone, orgsize = image_to_container(num, filename, container_obj, comptype, filesize=filesize)
+		cargsv = {'filesize': filesize}
+		cargsv['filepath'] = os.path.relpath(filename, startpath)
+
+		image_mode, compdone, orgsize = image_to_container(num, filename, container_obj, comptype, cargsv)
 		print(' '*18, str(compdone).ljust(18), str(image_mode).ljust(10), (str(round(orgsize*100, 3))+'%').ljust(10), filename)
 
 container_obj.write_to_file('../imagepack.bin')

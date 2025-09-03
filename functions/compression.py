@@ -36,9 +36,18 @@ def p4_to_p(imgdata):
 	oimgdata[1::2] = (imgdata&0x0F)
 	return oimgdata
 
+def lzma_decompress(data): 
+	import lzma
+	obj = lzma.LZMADecompressor()
+	data = obj.decompress(data)
+	return data
+
 def rle_getv(rawdata): 
 	tempdata = np.frombuffer(rawdata, 'B')
-	rle_vals, rle_repeats = rle.encode(tempdata)
+	return rle_getv_int(tempdata)
+
+def rle_getv_int(intdata): 
+	rle_vals, rle_repeats = rle.encode(intdata)
 	rle_vals = np.array(rle_vals, 'B')
 	rle_repeats = np.array(rle_repeats, 'I')
 	valrep = np.zeros(len(rle_repeats), np.dtype([('vals', np.uint8), ('repeats', np.uint32)]))
@@ -46,22 +55,40 @@ def rle_getv(rawdata):
 	valrep['repeats'] = rle_repeats
 	return valrep
 
-def lzma_decompress(data): 
-	import lzma
-	obj = lzma.LZMADecompressor()
-	data = obj.decompress(data)
-	return data
+def compress_sir16a_256(rawdata): 
+	intdata = np.frombuffer(rawdata, 'B')
+	int_gray = intdata[0::2].tobytes()
+	int_alpha = intdata[1::2].tobytes()
 
-def compress_sir16_256(rawdata): 
-	orgsize = len(rawdata)
-	valrep = rle_getv(rawdata)
+	comp_gray = compress_sir16_256(int_gray)
+	comp_alpha = compress_sir16_256(int_alpha)
+	if comp_gray and comp_alpha:
+		f = bytewriter.bytewriter()
+		f.uint32(len(rawdata))
+		f.uint32(len(comp_gray))
+		f.raw(comp_gray)
+		f.uint32(len(comp_alpha))
+		f.raw(comp_alpha)
+		return b'sir16a_256'+f.getvalue()
 
-	invalrep = rle_getv(valrep['repeats']>1)
+def decompress_sir16a_256(rawdata): 
+	b_in = bytereader.bytereader(rawdata)
+	b_in.magic_check(b'sir16a_256')
+	o = np.zeros(b_in.uint32(), np.uint8)
+	comp_gray = decompress_sir16_256(b_in.raw(b_in.uint32()))
+	comp_alpha = decompress_sir16_256(b_in.raw(b_in.uint32()))
+	o[0::2] = np.frombuffer(comp_gray, 'B')
+	o[1::2] = np.frombuffer(comp_alpha, 'B')
+	return o.tobytes()
+
+def compress_sir16_256(intdata): 
+	intdata = np.frombuffer(intdata, 'B')
+	orgsize = len(intdata)
+	valrep = rle_getv(intdata)
 	vals = valrep['vals']
 	countv = 0
-
 	f = bytewriter.bytewriter()
-	for inlong, inrepeats in invalrep:
+	for inlong, inrepeats in rle_getv(valrep['repeats']>1):
 		if f.end<orgsize:
 			if inlong==1:
 				for x in range(inrepeats):
@@ -76,7 +103,6 @@ def compress_sir16_256(rawdata):
 				countv += inrepeats
 		else:
 			return None
-
 	return b'sir16_256'+f.getvalue()
 
 def compress_sir16_256_old(rawdata): 

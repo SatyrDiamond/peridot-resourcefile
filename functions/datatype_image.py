@@ -22,7 +22,10 @@ ID_DATA = 3
 ID_COMPRESSTYPE = 4
 ID_PALLETE_COLORTYPE = 5
 ID_PALLETE_DATA = 6
-ID_FILENAME = 100
+
+ID_EDITOR_FILENAME = 100
+ID_EDITOR_FILETYPE = 101
+ID_EDITOR_FILEPATH = 102
 
 COL_TYPE_GRAY_1 = 'BW_1'
 COL_TYPE_GRAY_8 = 'BW_8'
@@ -42,7 +45,7 @@ COL_TYPE_INDEX_4 = 'IDX_4'
 COL_TYPE_INDEXA_4 = 'IDX_4A'
 COL_TYPE_INDEX_1 = 'IDX_1'
 
-COL_TYPE_GRAY_INDEX_4 = 'IDX_BW_4A'
+COL_TYPE_GRAY_INDEX_4 = 'IDX_BW_4'
 
 VERBOSE_COLTYPECHANGE = False
 MAX_MEGAPIXEL_SMALLER = 3000000
@@ -69,6 +72,11 @@ sir16_8_compat = (
 	COL_TYPE_INDEX_1,
 	)
 
+sir16a_8_compat = (
+	COL_TYPE_GRAY_8A, 
+	COL_TYPE_INDEXSA_8, 
+	)
+
 sir8_4_compat = (
 	COL_TYPE_INDEX_4,
 	COL_TYPE_INDEXA_4,
@@ -82,6 +90,8 @@ def compress_sir16(image_mode, rawdata):
 		return compression.compress_sir16_256(rawdata)
 	if image_mode in sir8_4_compat:
 		return compression.compress_sir16_16(rawdata)
+	if image_mode in sir16a_8_compat:
+		return compression.compress_sir16a_256(rawdata)
 
 def compress_sir8(image_mode, rawdata): 
 	if image_mode in sir8_4_compat:
@@ -92,6 +102,8 @@ def decompress_sir16(image_mode, rawdata):
 		return compression.decompress_sir16_256(rawdata)
 	if image_mode in sir8_4_compat:
 		return compression.decompress_sir16_16(rawdata)
+	if image_mode in sir16a_8_compat:
+		return compression.decompress_sir16a_256(rawdata)
 
 def decompress_sir8(image_mode, rawdata): 
 	if image_mode in sir8_4_compat:
@@ -566,14 +578,11 @@ def compress_lzma(rawdata):
 
 OPTIMIZE_DATA = 1
 
-def image_to_container(num, filename, container_obj, compress_mode, **kwargs): 
+def image_to_container(num, filepath, container_obj, compress_mode, cargsv): 
 	try:
-		imgdata = Image.open(filename)
+		imgdata = Image.open(filepath)
 		with container_obj.add_container(num) as w:
-			cargsv = {'filename': filename}
-			if 'index_filename' in kwargs: cargsv['filename'] = kwargs['index_filename']
-			if 'filesize' in kwargs: cargsv['filesize'] = kwargs['filesize']
-			return imageobj_to_containerdata(imgdata, w, compress_mode, **cargsv)
+			return imageobj_to_containerdata(imgdata, w, compress_mode, cargsv)
 	except KeyboardInterrupt:
 		exit()
 	#except:
@@ -581,18 +590,29 @@ def image_to_container(num, filename, container_obj, compress_mode, **kwargs):
 	#	print(traceback.format_exc())
 	#	return 'ERROR', None
 
-def imageobj_to_containerdata(imgdata, container_obj, compress_mode, **kwargs): 
+def imageobj_to_containerdata(imgdata, container_obj, compress_mode, cargsv): 
 	#print('image_to_container', filename, compress_mode)
 	container_obj.add_header_value(HEADER_ID__DATATYPE, T_UINT32, DATATYPE_IMAGE_SINGLE)
 
 	peri_image = peridot_image()
 	peri_image.from_pil_image(imgdata)
 	peri_image.optimize()
-	if 'filename' in kwargs:container_obj.add_value(ID_FILENAME, T_STRING, os.path.basename(kwargs['filename']))
+
+	if 'filepath' in cargsv:
+		filepath = cargsv['filepath']
+		basename = os.path.basename(cargsv['filepath'])
+		foldername = os.path.dirname(cargsv['filepath'])
+
+		basename, filetype = os.path.splitext(basename)
+
+		container_obj.add_value(ID_EDITOR_FILENAME, T_STRING, basename)
+		container_obj.add_value(ID_EDITOR_FILETYPE, T_STRING, filetype)
+		container_obj.add_value(ID_EDITOR_FILEPATH, T_STRING, foldername)
+
 	container_obj.add_value(ID_COLOR, T_STRING, peri_image.img_ctype)
 	container_obj.add_value_list(ID_SIZE, T_UINT32, [peri_image.width, peri_image.height])
 
-	if 'filesize' in kwargs: orgsize = kwargs['filesize']
+	if 'filesize' in cargsv: orgsize = cargsv['filesize']
 	else: orgsize = len(peri_image.img_data)
 
 	compdone = False
