@@ -27,6 +27,7 @@ ID_PALLETE_DATA = 6
 ID_EDITOR_FILENAME = 100
 ID_EDITOR_FILETYPE = 101
 ID_EDITOR_FILEPATH = 102
+ID_EDITOR_ORG_COLORTYPE = 103
 
 COL_TYPE_GRAY_1 = 'BW_1'
 COL_TYPE_GRAY_8 = 'BW_8'
@@ -117,6 +118,7 @@ class peridot_image:
 		self.pal_data = []
 		self.img_ctype = COL_TYPE_RGB_8
 		self.img_data = b'\0\0\0'
+		self.img_org_ctype = None
 
 	def is_compressed(self):
 		return (self.compress_mode or self.compress_li_mode)
@@ -188,26 +190,24 @@ class peridot_image:
 			rawdata = self.img_data
 			bestsizelist = []
 			bestsizelist.append([None, None, rawdata])
-			bestsizelist.append([None, 'lzma', compress_lzma(rawdata)])
-			if self.img_ctype == COL_TYPE_RGB_8 or self.img_ctype == COL_TYPE_RGBA_8:
-				bestsizelist.append(['qoi', 'lzma', 
-					compress_lzma(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
-					])
-	
 			bestsizelist.append([None, 'lz77', fastlz.compress(rawdata)])
+			bestsizelist.append([None, 'lzma', compress_lzma(rawdata)])
+			
 			if self.img_ctype == COL_TYPE_RGB_8 or self.img_ctype == COL_TYPE_RGBA_8:
-				bestsizelist.append(['qoi', 'lz77', 
-					fastlz.compress(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
-					])
+				qoid = compress_qoi(self.img_ctype, rawdata, self.width, self.height)
+				bestsizelist.append(['qoi', 'lz77', fastlz.compress(qoid)])
+				bestsizelist.append(['qoi', 'lzma', compress_lzma(qoid)])
 
 			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
 				bestsizelist.append(['sir8', None, rle_data])
+				bestsizelist.append(['sir8', 'lz77', fastlz.compress(rle_data)])
 				bestsizelist.append(['sir8', 'lzma', compress_lzma(rle_data)])
 
 			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
 				bestsizelist.append(['sir16', None, rle_data])
+				bestsizelist.append(['sir16', 'lz77', fastlz.compress(rle_data)])
 				bestsizelist.append(['sir16', 'lzma', compress_lzma(rle_data)])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
@@ -229,6 +229,7 @@ class peridot_image:
 				bestsizelist.append(['qoi', 'zlib', zlib.compress(qoi_data)])
 				bestsizelist.append(['qoi', 'brotli', brotli.compress(qoi_data)])
 				bestsizelist.append(['qoi', 'bz2', bz2.compress(qoi_data)])
+				bestsizelist.append(['qoi', 'lz77', fastlz.compress(qoi_data)])
 	
 			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
@@ -236,6 +237,7 @@ class peridot_image:
 				bestsizelist.append(['sir8', 'zlib', zlib.compress(rle_data)])
 				bestsizelist.append(['sir8', 'brotli', brotli.compress(rle_data)])
 				bestsizelist.append(['sir8', 'bz2', bz2.compress(rle_data)])
+				bestsizelist.append(['sir8', 'lz77', fastlz.compress(rle_data)])
 
 			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
@@ -243,6 +245,7 @@ class peridot_image:
 				bestsizelist.append(['sir16', 'zlib', zlib.compress(rle_data)])
 				bestsizelist.append(['sir16', 'brotli', brotli.compress(rle_data)])
 				bestsizelist.append(['sir16', 'bz2', bz2.compress(rle_data)])
+				bestsizelist.append(['sir16', 'lz77', fastlz.compress(rle_data)])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
 			self.compress_li_mode, self.compress_mode, self.img_data = bestsizelist[sorted(bestsizelist)[0]]
@@ -286,6 +289,8 @@ class peridot_image:
 		elif image_mode == 'RGBA': self.img_ctype = COL_TYPE_RGBA_8
 		else: print('unknown image_mode:', image_mode)
 
+		self.img_org_ctype = self.img_ctype
+
 		if image_mode == 'P':
 			p_colortype, p_data = imgdata.palette.getdata()
 
@@ -297,6 +302,7 @@ class peridot_image:
 				palvals = np.reshape(palvals, (len(palvals)//4, 4))
 				self.pal_data = palvals[:,[2,1,0]]
 			self.pal_data = self.pal_data.reshape((-1, 3))
+		return self.img_org_ctype
 
 	def convert__rgb8a__gray8a(self):
 		if not self.is_compressed():
@@ -606,7 +612,7 @@ def imageobj_to_containerdata(imgdata, container_obj, compress_mode, cargsv):
 	container_obj.add_header_value(HEADER_ID__DATATYPE, T_UINT32, DATATYPE_IMAGE_SINGLE)
 
 	peri_image = peridot_image()
-	peri_image.from_pil_image(imgdata)
+	org_ctype = peri_image.from_pil_image(imgdata)
 	peri_image.optimize()
 
 	if 'filepath' in cargsv:
@@ -619,6 +625,8 @@ def imageobj_to_containerdata(imgdata, container_obj, compress_mode, cargsv):
 		container_obj.add_value(ID_EDITOR_FILENAME, T_STRING, basename)
 		container_obj.add_value(ID_EDITOR_FILETYPE, T_STRING, filetype)
 		container_obj.add_value(ID_EDITOR_FILEPATH, T_STRING, foldername)
+
+	container_obj.add_value(ID_EDITOR_ORG_COLORTYPE, T_STRING, org_ctype)
 
 	container_obj.add_value(ID_COLOR, T_STRING, peri_image.img_ctype)
 	container_obj.add_value_list(ID_SIZE, T_UINT32, [peri_image.width, peri_image.height])
@@ -636,16 +644,19 @@ def imageobj_to_containerdata(imgdata, container_obj, compress_mode, cargsv):
 		if not compdone and 'qoi:zlib' in compress_mode: compdone = peri_image.li_compress('qoi', 'zlib')
 		if not compdone and 'qoi:brotli' in compress_mode: compdone = peri_image.li_compress('qoi', 'brotli')
 		if not compdone and 'qoi:bz2' in compress_mode: compdone = peri_image.li_compress('qoi', 'bz2')
+		if not compdone and 'qoi:lz77' in compress_mode: compdone = peri_image.li_compress('qoi', 'lz77')
 		if not compdone and 'sir8' in compress_mode: compdone = peri_image.li_compress('sir8', None)
 		if not compdone and 'sir8:lzma' in compress_mode: compdone = peri_image.li_compress('sir8', 'lzma')
 		if not compdone and 'sir8:zlib' in compress_mode: compdone = peri_image.li_compress('sir8', 'zlib')
 		if not compdone and 'sir8:brotli' in compress_mode: compdone = peri_image.li_compress('sir8', 'brotli')
 		if not compdone and 'sir8:bz2' in compress_mode: compdone = peri_image.li_compress('sir8', 'bz2')
+		if not compdone and 'sir8:lz77' in compress_mode: compdone = peri_image.li_compress('sir8', 'bz2')
 		if not compdone and 'sir16' in compress_mode: compdone = peri_image.li_compress('sir16', None)
 		if not compdone and 'sir16:lzma' in compress_mode: compdone = peri_image.li_compress('sir16', 'lzma')
 		if not compdone and 'sir16:zlib' in compress_mode: compdone = peri_image.li_compress('sir16', 'zlib')
 		if not compdone and 'sir16:brotli' in compress_mode: compdone = peri_image.li_compress('sir16', 'brotli')
 		if not compdone and 'sir16:bz2' in compress_mode: compdone = peri_image.li_compress('sir16', 'bz2')
+		if not compdone and 'sir16:lz77' in compress_mode: compdone = peri_image.li_compress('sir16', 'lz77')
 		if not compdone and 'zlib' in compress_mode: compdone = peri_image.compress('zlib')
 		if not compdone and 'lzma' in compress_mode: compdone = peri_image.compress('lzma')
 		if not compdone and 'brotli' in compress_mode: compdone = peri_image.compress('brotli')
