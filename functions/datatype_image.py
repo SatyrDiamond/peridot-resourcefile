@@ -15,6 +15,7 @@ import zlib
 import brotli
 import lzma
 import bz2
+import fastlz
 
 ID_COLOR = 1
 ID_SIZE = 2
@@ -31,20 +32,17 @@ COL_TYPE_GRAY_1 = 'BW_1'
 COL_TYPE_GRAY_8 = 'BW_8'
 COL_TYPE_GRAY_8A = 'BW_8A'
 COL_TYPE_GRAY_16 = 'BW_16'
-
-COL_TYPE_WHITE_8A = 'WHITE_8A'
-COL_TYPE_BLACK_8A = 'BLACK_8A'
-
 COL_TYPE_RGB_8 = 'RGB_8'
 COL_TYPE_RGBA_8 = 'RGBA_8'
-
 COL_TYPE_INDEX_8 = 'IDX_8'
-COL_TYPE_INDEXA_8 = 'IDX_8A'
-COL_TYPE_INDEXSA_8 = 'IDX_8A_SEP'
+
+COL_TYPE_INDEX_1 = 'IDX_1'
 COL_TYPE_INDEX_4 = 'IDX_4'
 COL_TYPE_INDEXA_4 = 'IDX_4A'
-COL_TYPE_INDEX_1 = 'IDX_1'
-
+COL_TYPE_INDEXA_8 = 'IDX_8A'
+COL_TYPE_INDEXSA_8 = 'IDX_8A_SEP'
+COL_TYPE_WHITE_8A = 'WHITE_8A'
+COL_TYPE_BLACK_8A = 'BLACK_8A'
 COL_TYPE_GRAY_INDEX_4 = 'IDX_BW_4'
 
 VERBOSE_COLTYPECHANGE = False
@@ -62,7 +60,7 @@ def compress_qoi(image_mode, rawdata, width, height):
 		rawdata = qoi.encode(rgb)
 		return rawdata
 
-sir16_8_compat = (
+sir16_8_compat = [
 	COL_TYPE_GRAY_8, 
 	COL_TYPE_INDEXA_8, 
 	COL_TYPE_INDEX_8, 
@@ -70,20 +68,20 @@ sir16_8_compat = (
 	COL_TYPE_BLACK_8A,
 	COL_TYPE_GRAY_1,
 	COL_TYPE_INDEX_1,
-	)
+	]
 
-sir16a_8_compat = (
+sir16a_8_compat = [
 	COL_TYPE_GRAY_8A, 
 	COL_TYPE_INDEXSA_8, 
-	)
+	]
 
-sir8_4_compat = (
+sir8_4_compat = [
 	COL_TYPE_INDEX_4,
 	COL_TYPE_INDEXA_4,
 	COL_TYPE_GRAY_INDEX_4, 
 	COL_TYPE_GRAY_1,
 	COL_TYPE_INDEX_1,
-	)
+	]
 
 def compress_sir16(image_mode, rawdata): 
 	if image_mode in sir16_8_compat:
@@ -134,6 +132,7 @@ class peridot_image:
 			elif 'lzma' == comptype: orawdata = compress_lzma(self.img_data)
 			elif 'brotli' == comptype: orawdata = brotli.compress(self.img_data)
 			elif 'bz2' == comptype: orawdata = bz2.compress(self.img_data)
+			elif 'lz77' == comptype: orawdata = fastlz.compress(self.img_data)
 			if orawdata is not None:
 				if len(orawdata)<len(self.img_data):
 					self.img_data = orawdata
@@ -162,18 +161,23 @@ class peridot_image:
 			rawdata = self.img_data
 			bestsizelist = []
 			bestsizelist.append([None, None, rawdata])
-			if self.img_ctype == COL_TYPE_RGB_8 or self.img_ctype == COL_TYPE_RGBA_8:
+
+			if self.img_ctype in [COL_TYPE_RGB_8, COL_TYPE_RGBA_8]:
 				bestsizelist.append(['qoi', None, 
 					compress_qoi(self.img_ctype, rawdata, self.width, self.height)
 					])
 	
+			bestsizelist.append([None, 'lz77', fastlz.compress(rawdata)])
+
 			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
 				bestsizelist.append(['sir8', None, rle_data])
+			#	bestsizelist.append(['sir8', 'lz77', fastlz.compress(rle_data)])
 
 			rle_data = compress_sir16(self.img_ctype, rawdata)
 			if rle_data: 
 				bestsizelist.append(['sir16', None, rle_data])
+			#	bestsizelist.append(['sir16', 'lz77', fastlz.compress(rle_data)])
 
 			bestsizelist = dict([[len(x[2]), x] for x in bestsizelist])
 			self.compress_li_mode, self.compress_mode, self.img_data = bestsizelist[sorted(bestsizelist)[0]]
@@ -190,6 +194,12 @@ class peridot_image:
 					compress_lzma(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
 					])
 	
+			bestsizelist.append([None, 'lz77', fastlz.compress(rawdata)])
+			if self.img_ctype == COL_TYPE_RGB_8 or self.img_ctype == COL_TYPE_RGBA_8:
+				bestsizelist.append(['qoi', 'lz77', 
+					fastlz.compress(compress_qoi(self.img_ctype, rawdata, self.width, self.height))
+					])
+
 			rle_data = compress_sir8(self.img_ctype, rawdata)
 			if rle_data: 
 				bestsizelist.append(['sir8', None, rle_data])
@@ -251,6 +261,7 @@ class peridot_image:
 			elif 'lzma' == self.compress_mode: self.img_data = compression.lzma_decompress(self.img_data)
 			elif 'brotli' == self.compress_mode: self.img_data = brotli.decompress(self.img_data)
 			elif 'bz2' == self.compress_mode: self.img_data = bz2.decompress(self.img_data)
+			elif 'lz77' == self.compress_mode: self.img_data = fastlz.decompress(self.img_data)
 			self.compress_mode = None
 		self.li_decompress()
 
