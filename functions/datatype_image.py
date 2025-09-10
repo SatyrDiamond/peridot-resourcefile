@@ -1,4 +1,5 @@
 from objects.peridot_obj import *
+from objects.peridot_datatypes import *
 from functions.values_datatype import *
 from objects.data_bytes import bytewriter
 from objects.data_bytes import bytereader
@@ -555,6 +556,8 @@ class peridot_image:
 		elif self.img_ctype == COL_TYPE_INDEX_8: 
 			imgdata = Image.new('P', (self.width, self.height))
 			imgdata.putpalette(self.pal_data)
+			if (self.width*self.height)>len(self.img_data):
+				self.img_data += b'\0'*((self.width*self.height)-len(self.img_data))
 			imgdata.frombytes(self.img_data)
 		else: print('unknown img_ctype:', self.img_ctype)
 		if imgdata is not None: imgdata.save(filename)

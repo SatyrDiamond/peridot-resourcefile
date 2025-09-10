@@ -2,7 +2,7 @@ from objects.peridot_obj import *
 from functions.datatype_image import *
 import os
 
-comptype = ['best']
+comptype = ['fast']
 
 container_obj = peridot_container()
 container_obj.datatype = 'Topaz ImgPack'
@@ -23,7 +23,7 @@ for num, filename in enumerate(paths):
 
 		cargsv = {'filesize': filesize}
 		cargsv['filepath'] = os.path.relpath(filename, startpath)
-		#cargsv['nometa'] = True
+		cargsv['nometa'] = True
 
 		image_mode, compdone, orgsize = image_to_container(num, filename, container_obj, comptype, cargsv)
 		print(' '*18, str(compdone).ljust(18), str(image_mode).ljust(10), (str(round(orgsize*100, 3))+'%').ljust(10), filename)

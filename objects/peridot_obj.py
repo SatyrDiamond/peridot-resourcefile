@@ -1,231 +1,22 @@
 from objects import easybinrw
+from objects import peridot_datatypes
 from objects.data_bytes import bytewriter
 from contextlib import contextmanager
-
-T_NONE			= 0x0000
-T_UINT8			= 0x0001
-T_UINT16		= 0x0002
-T_UINT32		= 0x0003
-T_UINT64		= 0x0004
-T_INT8			= 0x0005
-T_INT16			= 0x0006
-T_INT32			= 0x0007
-T_INT64			= 0x0008
-T_BOOL			= 0x0009
-T_FLOAT			= 0x000A
-T_DOUBLE		= 0x000B
-T_STRING		= 0x000C
-T_BYTES			= 0x000D
-T_CONTAINER		= 0xFFFF
-T_LONGSTRING	= 0x0010
 
 TM_VALUE		= 0x01
 TM_LIST			= 0x02
 
 TS_RESIDENT		= 0x00
-TS_GLOBAL		= 0x01
-TS_CONTAIN		= 0x02
+TS_GLOBAL		= 0x02
+TS_CONTAIN		= 0x03
 
-class classval_none:
-	name = 'none'
-	hexcode = 0x0000
-	def write_single(byw_stream, value): pass
-	def write_list(byw_stream, value): pass
-	def read_single(ebr_str, **kwargs): return None
-	def read_list(ebr_str, count): return None
-class classval_uint8:
-	name = 'uint8'
-	hexcode = 0x0001
-	def write_single(byw_stream, value): byw_stream.uint8(value)
-	def write_list(byw_stream, value): byw_stream.l_uint8(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int_u8()
-	def read_list(ebr_str, count): return ebr_str.list_int_u8(count)
-	def skip_single(ebr_str): return 1
-	def skip_list(ebr_str, count): return count
-class classval_uint16:
-	name = 'uint16'
-	hexcode = 0x0002
-	def write_single(byw_stream, value): byw_stream.uint16(value)
-	def write_list(byw_stream, value): byw_stream.l_uint16(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int_u16()
-	def read_list(ebr_str, count): return ebr_str.list_int_u16(count)
-	def skip_single(ebr_str): return 2
-	def skip_list(ebr_str, count): return count*2
-class classval_uint32:
-	name = 'uint32'
-	hexcode = 0x0003
-	def write_single(byw_stream, value): byw_stream.uint32(value)
-	def write_list(byw_stream, value): byw_stream.l_uint32(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int_u32()
-	def read_list(ebr_str, count): return ebr_str.list_int_u32(count)
-	def skip_single(ebr_str): return 4
-	def skip_list(ebr_str, count): return count*4
-class classval_uint64:
-	name = 'uint64'
-	hexcode = 0x0004
-	def write_single(byw_stream, value): byw_stream.uint64(value)
-	def write_list(byw_stream, value): 
-		for x in value: byw_stream.uint64(x)
-	def read_single(ebr_str, **kwargs): return ebr_str.int_u64()
-	def read_list(ebr_str, count): return [ebr_str.int_u64() for x in range(count)]
-	def skip_single(ebr_str): return 8
-	def skip_list(ebr_str, count): return count*8
-class classval_int8:
-	name = 'int8'
-	hexcode = 0x0005
-	def write_single(byw_stream, value): byw_stream.int8(value)
-	def write_list(byw_stream, value): byw_stream.l_int8(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int8()
-	def read_list(ebr_str, count): return ebr_str.list_int_s8(count)
-	def skip_single(ebr_str): return 1
-	def skip_list(ebr_str, count): return count
-class classval_int16:
-	name = 'int16'
-	hexcode = 0x0006
-	def write_single(byw_stream, value): byw_stream.int16(value)
-	def write_list(byw_stream, value): byw_stream.l_uint16(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int_s16()
-	def read_list(ebr_str, count): return ebr_str.list_int_s16(count)
-	def skip_single(ebr_str): return 2
-	def skip_list(ebr_str, count): return count*2
-class classval_int32:
-	name = 'int32'
-	hexcode = 0x0007
-	def write_single(byw_stream, value): byw_stream.int32(value)
-	def write_list(byw_stream, value): byw_stream.l_int32(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int32()
-	def read_list(ebr_str, count): return ebr_str.list_int_s32(count)
-	def skip_single(ebr_str): return 4
-	def skip_list(ebr_str, count): return count*4
-class classval_int64:
-	name = 'int64'
-	hexcode = 0x0008
-	def write_single(byw_stream, value): byw_stream.int64(value)
-	def write_list(byw_stream, value): 
-		for x in value: byw_stream.int64(x)
-	def read_single(ebr_str, **kwargs): return ebr_str.int64()
-	def read_list(ebr_str, count): return [ebr_str.list_int_s64() for x in range(count)]
-	def skip_single(ebr_str): return 8
-	def skip_list(ebr_str, count): return count*8
-class classval_bool:
-	name = 'bool'
-	hexcode = 0x0009
-	def write_single(byw_stream, value): byw_stream.int8(int(value))
-	def write_list(byw_stream, value): byw_stream.l_int8(value, len(value))
-	def read_single(ebr_str, **kwargs): return bool(ebr_str.int8())
-	def read_list(ebr_str, count): return ebr_str.list_int_s8(count)
-	def skip_single(ebr_str): return 1
-	def skip_list(ebr_str, count): return count*1
-class classval_float:
-	name = 'float'
-	hexcode = 0x000A
-	def write_single(byw_stream, value): byw_stream.float(value)
-	def write_list(byw_stream, value): byw_stream.l_float(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.float()
-	def read_list(ebr_str, count): return ebr_str.list_float(count)
-	def skip_single(ebr_str): return 4
-	def skip_list(ebr_str, count): return count*4
-class classval_double:
-	name = 'double'
-	hexcode = 0x000B
-	def write_single(byw_stream, value): byw_stream.double(value)
-	def write_list(byw_stream, value): byw_stream.l_double(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.double()
-	def read_list(ebr_str, count): return ebr_str.list_double(count)
-	def skip_single(ebr_str): return 8
-	def skip_list(ebr_str, count): return count*8
-class classval_string:
-	name = 'string'
-	hexcode = 0x000C
-	def write_single(byw_stream, value): byw_stream.c_raw__int8(value.encode())
-	def write_list(byw_stream, value): 
-		ibyw_stream = bytewriter.bytewriter()
-		for x in value: ibyw_stream.c_raw__int8(x.encode())
-		outval = ibyw_stream.getvalue()
-		byw_stream.uint32(len(outval))
-		byw_stream.raw(ibyw_stream.getvalue())
-	def read_single(ebr_str, **kwargs): return ebr_str.string(ebr_str.int_u8())
-	def read_list(ebr_str, count): ebr_str.skip(ebr_str.int_u32())
-	def skip_single(ebr_str): return ebr_str.int_u8()
-	def skip_list(ebr_str, count): return ebr_str.int_u32()
-class classval_raw:
-	name = 'raw'
-	hexcode = 0x000D
-	def write_single(byw_stream, value): byw_stream.c_raw__int32(value, True)
-	def write_list(byw_stream, value): 
-		ibyw_stream = bytewriter.bytewriter()
-		for x in value: ibyw_stream.c_raw__int32(x, True)
-		outval = ibyw_stream.getvalue()
-		byw_stream.uint32(len(outval))
-		byw_stream.raw(ibyw_stream.getvalue())
-	def read_single(ebr_str, **kwargs): return ebr_str.raw(ebr_str.int_u32())
-	def read_list(ebr_str, count): 
-		endpos = ebr_str.tell_real()+ebr_str.int_u32()+4
-		outval = [ebr_str.raw(ebr_str.int_u32()) for x in range(count)]
-		ebr_str.seek_real(endpos)
-		return outval
-	def skip_single(ebr_str): return ebr_str.int_u32()
-	def skip_list(ebr_str, count): return ebr_str.int_u32()
-class classval_container:
-	name = 'container'
-	hexcode = 0xFFFF
-	def write_single(byw_stream, value): 
-		c = peridot_container()
-		c.datatype = b'Folder'
-		c.data = value
-		byw_stream.c_raw__int32(c.folder_write(), True)
-	def read_single(ebr_str, **kwargs): 
-		datasize = ebr_str.int_u32()
-		value = peridot_container()
-		value.datatype = b'Folder'
-		value.folder_read(ebr_str, **kwargs)
-		return value.data
-	def skip_single(ebr_str): return ebr_str.int_u32()
-class classval_longstring:
-	name = 'longstring'
-	hexcode = 0x0010
-	def write_single(byw_stream, value): byw_stream.c_raw__int32(value.encode(), True)
-	def write_list(byw_stream, value): 
-		ibyw_stream = bytewriter.bytewriter()
-		for x in value: ibyw_stream.c_raw__int32(x.encode(), True)
-		outval = ibyw_stream.getvalue()
-		byw_stream.uint32(len(outval))
-		byw_stream.raw(ibyw_stream.getvalue())
-	def read_single(ebr_str, **kwargs): return ebr_str.string(ebr_str.int_u32())
-	def read_list(ebr_str, count): 
-		endpos = ebr_str.tell_real()+ebr_str.int_u32()+4
-		outval = [ebr_str.string(ebr_str.int_u32()) for x in range(count)]
-		ebr_str.seek_real(endpos)
-		return outval
-	def skip_single(ebr_str): return ebr_str.int_u32()
-	def skip_list(ebr_str, count): return ebr_str.int_u32()
-
-inclass = [
-classval_none,
-classval_uint8,
-classval_uint16,
-classval_uint32,
-classval_uint64,
-classval_int8,
-classval_int16,
-classval_int32,
-classval_int64,
-classval_bool,
-classval_float,
-classval_double,
-classval_string,
-classval_raw,
-classval_container,
-classval_longstring,
-]
-
-hexcodes = dict([[x.hexcode, x] for x in inclass])
-classnames = dict([[x.hexcode, x.name] for x in inclass])
+hexcodes = peridot_datatypes.hexcodes
+classnames = peridot_datatypes.classnames
 
 class peridot_pointer:
 	def __init__(self):
 		self.pointer_global = False
-		self.pointer_filenum = 0
+		self.pointer_filenum = -1
 		self.pointer_pos = 0
 
 	def __repr__(self):
@@ -249,14 +40,14 @@ class peridot_typeval:
 		self.storage = 0
 
 	def read_typeval(self, intype):
-		self.valtype = intype&0xFFFF
-		self.modifier = (intype>>16)&0xFF
-		self.storage = (intype>>24)&0xFF
+		self.valtype = intype&0xFF
+		self.modifier = (intype>>8)&0xF
+		self.storage = (intype>>12)&0xF
 
 	def write_type(self):
 		lowtype = self.valtype
-		hightype = (self.modifier<<16)
-		veryhightype = (self.storage<<24)
+		hightype = (self.modifier<<8)
+		veryhightype = (self.storage<<12)
 		return lowtype+hightype+veryhightype
 
 	def __repr__(self):
@@ -273,15 +64,15 @@ class peridot_typeval:
 		return '<Peridot Type - %s>' % outtxt
 
 	def read(self, ebr_str, **kwargs):
-		self.read_typeval(ebr_str.int_u32())
+		self.read_typeval(ebr_str.int_u16())
 		return self.value_read(ebr_str, **kwargs)
 
 	def write(self, byw_stream, value):
-		byw_stream.uint32(self.write_type())
+		byw_stream.uint16(self.write_type())
 		self.value_write(byw_stream, value)
 
 	def skip(self, ebr_str):
-		self.read_typeval(ebr_str.int_u32())
+		self.read_typeval(ebr_str.int_u16())
 		return self.value_skip(ebr_str)
 
 	def value_write(self, byw_stream, value):
@@ -417,7 +208,7 @@ class peridot_container:
 			part_obj.id = vid
 
 			type_obj = part_obj.type
-			type_obj.valtype = T_CONTAINER
+			type_obj.valtype = peridot_datatypes.T_CONTAINER
 			type_obj.modifier = TM_VALUE
 			self.data.append(part_obj)
 

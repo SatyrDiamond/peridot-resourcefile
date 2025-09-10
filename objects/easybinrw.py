@@ -91,8 +91,7 @@ class binread:
 
 	def fileno(self): return self.filenum
 
-	def magic_check(self, bind): 
-		assert bind==self.str.read(len(bind))
+	def magic_check(self, bind): assert bind==self.str.read(len(bind))
 
 	def read(self, num): return self.str.read(num)
 	def tell(self): return self.str.tell()
@@ -106,7 +105,6 @@ class binread:
 	def skip(self, num): return self.str.seek(self.str.tell()+num)
 
 	def remaining(self): return max(0, self.state.end-self.tell())
-
 	def rest(self): return self.str.read(self.remaining())
 
 	def int_s8(self): return self.unp_s8(self.str.read(1))[0]
