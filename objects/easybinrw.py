@@ -39,7 +39,7 @@ class binread:
 	dt_s16_n = np.dtype('h')
 	dt_u16_n = np.dtype('H')
 	dt_s32_n = np.dtype('i')
-	dt_u32_n = np.dtype('L')
+	dt_u32_n = np.dtype('I')
 	dt_s64_n = np.dtype('q')
 	dt_u64_n = np.dtype('Q')
 	dt_float_n = np.dtype('f')
@@ -48,7 +48,7 @@ class binread:
 	dt_s16_b = np.dtype('>h')
 	dt_u16_b = np.dtype('>H')
 	dt_s32_b = np.dtype('>i')
-	dt_u32_b = np.dtype('>L')
+	dt_u32_b = np.dtype('>I')
 	dt_s64_b = np.dtype('>q')
 	dt_u64_b = np.dtype('>Q')
 	dt_float_b = np.dtype('>f')
@@ -57,7 +57,7 @@ class binread:
 	dt_s16_l = np.dtype('<h')
 	dt_u16_l = np.dtype('<H')
 	dt_s32_l = np.dtype('<i')
-	dt_u32_l = np.dtype('<L')
+	dt_u32_l = np.dtype('<I')
 	dt_s64_l = np.dtype('<q')
 	dt_u64_l = np.dtype('<Q')
 	dt_float_l = np.dtype('<f')
@@ -140,7 +140,9 @@ class binread:
 	def raw(self, num): return self.str.read(num)
 	def string(self, num, **k): return self.str.read(num).decode(**k)
 
-	def internal_readarr(self, num, numbytes, dtype): return np.frombuffer(self.read(num*numbytes), dtype)
+	def internal_readarr(self, num, numbytes, dtype): 
+		byteds = self.read(num*numbytes)
+		return np.frombuffer(byteds, dtype)
 
 	def list_int_s8(self, num): return self.internal_readarr(num, 1, self.dt_s8)
 	def list_int_u8(self, num): return self.internal_readarr(num, 1, self.dt_u8)

@@ -43,6 +43,7 @@ class peridot_typeval:
 		self.valtype = intype&0xFF
 		self.modifier = (intype>>8)&0xF
 		self.storage = (intype>>12)&0xF
+		print(self)
 
 	def write_type(self):
 		lowtype = self.valtype
@@ -182,7 +183,7 @@ class peridot_part:
 		return self.val
 
 	def getbytes(self, ebr_str):
-		ebr_str.seek_real(self.reado_pos+4)
+		ebr_str.seek_real(self.reado_pos+2)
 		return self.type.getbytes(ebr_str)
 
 HEADER_ID__EXTFILE_GLOBAL		= 0x00000001
@@ -285,6 +286,8 @@ class peridot_container:
 		self.write_w_header(byw_stream)
 		f = open(filename, 'wb')
 		f.write(byw_stream.getvalue())
+		f.flush()
+		f.close()
 
 	def write_w_header(self, byw_stream):
 		byw_stream.raw(b'Peridot Data Storage            ')

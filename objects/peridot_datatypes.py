@@ -71,7 +71,7 @@ class classval_int8:
 	hexcode = T_INT8
 	def write_single(byw_stream, value): byw_stream.int8(value)
 	def write_list(byw_stream, value): byw_stream.l_int8(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int8()
+	def read_single(ebr_str, **kwargs): return ebr_str.int_s8()
 	def read_list(ebr_str, count): return ebr_str.list_int_s8(count)
 	def skip_single(ebr_str): return 1
 	def skip_list(ebr_str, count): return count
@@ -89,7 +89,7 @@ class classval_int32:
 	hexcode = T_INT32
 	def write_single(byw_stream, value): byw_stream.int32(value)
 	def write_list(byw_stream, value): byw_stream.l_int32(value, len(value))
-	def read_single(ebr_str, **kwargs): return ebr_str.int32()
+	def read_single(ebr_str, **kwargs): return ebr_str.int_s32()
 	def read_list(ebr_str, count): return ebr_str.list_int_s32(count)
 	def skip_single(ebr_str): return 4
 	def skip_list(ebr_str, count): return count*4
@@ -99,8 +99,8 @@ class classval_int64:
 	def write_single(byw_stream, value): byw_stream.int64(value)
 	def write_list(byw_stream, value): 
 		for x in value: byw_stream.int64(x)
-	def read_single(ebr_str, **kwargs): return ebr_str.int64()
-	def read_list(ebr_str, count): return [ebr_str.list_int_s64() for x in range(count)]
+	def read_single(ebr_str, **kwargs): return ebr_str.int_s64()
+	def read_list(ebr_str, count): return ebr_str.list_int_s64(count)
 	def skip_single(ebr_str): return 8
 	def skip_list(ebr_str, count): return count*8
 class classval_bool:
@@ -108,7 +108,7 @@ class classval_bool:
 	hexcode = T_BOOL
 	def write_single(byw_stream, value): byw_stream.int8(int(value))
 	def write_list(byw_stream, value): byw_stream.l_int8(value, len(value))
-	def read_single(ebr_str, **kwargs): return bool(ebr_str.int8())
+	def read_single(ebr_str, **kwargs): return bool(ebr_str.int_s8())
 	def read_list(ebr_str, count): return ebr_str.list_int_s8(count)
 	def skip_single(ebr_str): return 1
 	def skip_list(ebr_str, count): return count*1
