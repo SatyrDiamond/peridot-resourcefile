@@ -27,6 +27,8 @@ class classval_none:
 	def write_list(byw_stream, value): pass
 	def read_single(ebr_str, **kwargs): return None
 	def read_list(ebr_str, count): return None
+	def skip_single(ebr_str): return 0
+	def skip_list(ebr_str, count): return 0
 class classval_uint8:
 	name = 'uint8'
 	hexcode = T_UINT8
